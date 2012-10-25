@@ -1,11 +1,20 @@
+# https://github.com/webarbeit/logo-seeker
 require 'rubygems'
 require 'selenium-webdriver'
+
+# -------------------------------------------------
+# FindoLogo Class
+#   => Visits a website and searchs for an image (logo)
+#   => Logs results to results.txt
+#   => Takes screenshot (images/screenshots/)
 
 class FindoLogo
 
     attr_accessor :driver, :image_dir, :urls
 
     def initialize(urls, logos = [], log_file_name = 'results.txt')
+        puts "Starting selenium-webdriver ..."
+
         @driver = Selenium::WebDriver.for :firefox
         @image_dir = 'images/screenshots'
         @urls = urls
@@ -24,7 +33,13 @@ class FindoLogo
         logo = @logos[0]
 
         begin
-            log_to_file "Image-Src Test passed for logo #{logo}" if @driver.find_element(:xpath => "//img[@src='logo']").displayed?
+            wait = Selenium::WebDriver::Wait.new(:timeout => 2)
+ 
+            # Check that the image exists using different attributes and xpath
+            log_to_file "Image-Src Test passed for logo #{logo}" if wait.until {
+                @driver.find_element(:xpath => "//img[@src='#{logo}']").displayed?
+            }
+
         rescue Exception => e
             log_to_file "Image-Src Test failed for logo #{logo}"
         end
@@ -57,8 +72,7 @@ class FindoLogo
     end
 
     def log_to_file message
-        puts message
-
+        puts message # For command line
         File.open(@log_file, 'a+') {|file| file.write("#{message}\n") }
     end
 end
@@ -66,13 +80,13 @@ end
 # ----------------------------------
 # Setup and init
 # ----------------------------------
-logos = [
-    'http://findologic.com/bild/frauLupe_beschn_206x668.jpg'
+logos_to_search_for = [
+    
 ]
 
 urls = {
-    "Findologic" => "http://findologic.com/de/"
+    
 }
 
-finder = FindoLogo.new(urls, logos)
+finder = FindoLogo.new(urls, logos_to_search_for)
 finder.visit_urls
