@@ -50,8 +50,6 @@ class FindoLogo
 
     def test_if_wrapper_visible?(selector = 'findologic_logo')
         
-        #http://selenium.rubyforge.org/rdoc/classes/Selenium/SeleniumDriver.html#M000188
-
         begin 
             wait = Selenium::WebDriver::Wait.new(:timeout => 3)
             
@@ -93,7 +91,7 @@ class FindoLogo
 
         quit
 
-        # match_logos_with_screenshots
+        # match_logos_with_screenshots        
     end
 
     def match_logos_with_screenshots
@@ -118,12 +116,11 @@ end
 # Setup and init
 # ----------------------------------
 logos_to_search_for = [
-    'https://secure.findologic.com/www/images/FINDOLOGIC_claimer_german_grau.png'
+
 ]
 
 urls = {
-    "Outsore.de" => "http://www.outstore.de/?searchparam=hemd&cl=search&stoken=C69F5089&force_sid=&lang=0&ref=teaser",
-    'Playtin' => 'http://www.playtin.com'
+    
 }
 
 finder = FindoLogo.new(urls, logos_to_search_for)
