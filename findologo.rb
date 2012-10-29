@@ -12,37 +12,47 @@ class FindoLogo
 
     attr_accessor :driver, :image_dir, :urls
 
-    def initialize(urls, logos = [], log_file_name = 'results.txt')
+    def initialize(options)
         puts "Starting selenium-webdriver ..."
 
         @driver = Selenium::WebDriver.for :firefox
         @image_dir = 'images/screenshots'
-        @urls = urls
-        @logos = logos
+        @urls = options[:urls_to_visit]
+        @logos = options[:logos_to_search_for]
 
-        @log_file = log_file_name
+        @log_file = 'results.txt' # options[:log_file_name] ||
         File.delete(@log_file) if File.exists?(@log_file)
     end
 
     def take_screenshot(name)
-        @driver.save_screenshot("#{@image_dir}/#{name.downcase}.png")
-        log_to_file 'Screenshot taken.'
+        path = "#{@image_dir}/#{name.downcase}.png"
+        @driver.save_screenshot(path)
+        log_to_file "Screenshot taken [Saved to: #{path}]"
     end
 
-    def test_if_image_exists?(image_src = '')
-        
-        logo = @logos[0]
+    # Returns true if at least one image was found
+    def search_for_images_by_src(logos = [])
+        @logos ||= logos
 
+       # @logos.each do |key|
+            return true if image_with_src_exists?(@logos[0])
+        #end
+
+        return false
+    end
+
+    # Returns true if image was found
+    def image_with_src_exists?(image_src = '')
+        
         begin
             wait = Selenium::WebDriver::Wait.new(:timeout => 2)
  
-            # Check that the image exists using different attributes and xpath
-            log_to_file "Image-Src Test passed for logo #{logo}" if wait.until {
-                @driver.find_element(:xpath => "//img[@src='#{logo}']").displayed?
+            log_to_file "Done: found image #{image_src}" if wait.until {
+                @driver.find_element(:xpath => "//img[@src='#{image_src}']").displayed?
             }
             true
         rescue Exception => e
-            log_to_file "Image-Src Test failed for logo #{logo}"
+            log_to_file "Failed: could not find image with src: #{image_src}"
             false
         end
 
@@ -60,15 +70,22 @@ class FindoLogo
                     log_to_file "Done: .#{selector} selector is visible"
                     true
                 else
-                    log_to_file "Error: .#{selector} selector is hidden"
+                    log_to_file "Error: .#{selector} selector is hidden or not found"
                     false
-                end                
+                end
             }
         rescue Exception => e
-            log_to_file "Visiblity-Test failed for selector #{selector}"
+            log_to_file "Failed: .#{selector} selector is hidden or not found"
             false
         end
 
+    end
+
+    def execute_tests
+        img_exists = search_for_images_by_src
+        wrapper_exists = test_if_wrapper_visible?
+
+        return img_exists || wrapper_exists
     end
 
     def visit_urls        
@@ -80,22 +97,16 @@ class FindoLogo
 
             @driver.get url
 
-            img_exists = test_if_image_exists?
-            wrapper_exists = test_if_wrapper_visible?
-            
-            unless img_exists || wrapper_exists
+            unless execute_tests
                 take_screenshot(key)
+                log_to_file ">>>>>>>>>>>>>>>>>>>>>> FAILED"
+            else
+                log_to_file ">>>>>>>>>>>>>>>>>>>>>> PASSED"
             end
 
         end
 
-        quit
-
-        # match_logos_with_screenshots        
-    end
-
-    def match_logos_with_screenshots
-        # Object recognition comes here ...
+        quit  
     end
 
     def quit
@@ -115,13 +126,16 @@ end
 # ----------------------------------
 # Setup and init
 # ----------------------------------
-logos_to_search_for = [
-
+logos = [
+  
 ]
 
-urls = {
-    
+urls = {   
+    'Google' => "http://www.google.at"
 }
 
-finder = FindoLogo.new(urls, logos_to_search_for)
+finder = FindoLogo.new({ 
+    :urls_to_visit => urls, 
+    :logos_to_search_for => logos
+})
 finder.visit_urls
