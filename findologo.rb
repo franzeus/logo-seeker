@@ -26,9 +26,10 @@ class FindoLogo
 
     def take_screenshot(name)
         @driver.save_screenshot("#{@image_dir}/#{name.downcase}.png")
+        log_to_file 'Screenshot taken.'
     end
 
-    def test_for_image_src
+    def test_if_image_exists?(image_src = '')
         
         logo = @logos[0]
 
@@ -39,9 +40,35 @@ class FindoLogo
             log_to_file "Image-Src Test passed for logo #{logo}" if wait.until {
                 @driver.find_element(:xpath => "//img[@src='#{logo}']").displayed?
             }
-
+            true
         rescue Exception => e
             log_to_file "Image-Src Test failed for logo #{logo}"
+            false
+        end
+
+    end
+
+    def test_if_wrapper_visible?(selector = 'findologic_logo')
+        
+        #http://selenium.rubyforge.org/rdoc/classes/Selenium/SeleniumDriver.html#M000188
+
+        begin 
+            wait = Selenium::WebDriver::Wait.new(:timeout => 3)
+            
+            wait.until {
+                linkWrapper = @driver.find_element(:class, selector)
+
+                if linkWrapper.displayed?
+                    log_to_file "Done: .#{selector} selector is visible"
+                    true
+                else
+                    log_to_file "Error: .#{selector} selector is hidden"
+                    false
+                end                
+            }
+        rescue Exception => e
+            log_to_file "Visiblity-Test failed for selector #{selector}"
+            false
         end
 
     end
@@ -55,12 +82,22 @@ class FindoLogo
 
             @driver.get url
 
-            test_for_image_src
-            take_screenshot(key)
+            img_exists = test_if_image_exists?
+            wrapper_exists = test_if_wrapper_visible?
+            
+            unless img_exists || wrapper_exists
+                take_screenshot(key)
+            end
 
         end
 
         quit
+
+        # match_logos_with_screenshots
+    end
+
+    def match_logos_with_screenshots
+        # Object recognition comes here ...
     end
 
     def quit
@@ -81,11 +118,12 @@ end
 # Setup and init
 # ----------------------------------
 logos_to_search_for = [
-    
+    'https://secure.findologic.com/www/images/FINDOLOGIC_claimer_german_grau.png'
 ]
 
 urls = {
-    
+    "Outsore.de" => "http://www.outstore.de/?searchparam=hemd&cl=search&stoken=C69F5089&force_sid=&lang=0&ref=teaser",
+    'Playtin' => 'http://www.playtin.com'
 }
 
 finder = FindoLogo.new(urls, logos_to_search_for)
