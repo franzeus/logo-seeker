@@ -1,6 +1,7 @@
 # https://github.com/webarbeit/logo-seeker
 require 'rubygems'
 require 'selenium-webdriver'
+require 'RMagick'
 
 # -------------------------------------------------
 # FindoLogo Class
@@ -10,7 +11,7 @@ require 'selenium-webdriver'
 
 class FindoLogo
 
-    attr_accessor :driver, :image_dir, :urls
+    attr_accessor :driver, :image_dir, :urls, :logos
 
     def initialize(options)
         puts "Starting selenium-webdriver ..."
@@ -30,6 +31,23 @@ class FindoLogo
         log_to_file "Screenshot taken [Saved to: #{path}]"
     end
 
+    def search_for_logo_in_screenshot
+
+        logo = Magick::Image.read("images/logos/logo1.png").first
+        target = Magick::Image.read("images/screenshots/.png").first
+
+        state = target.find_similar_region(logo)
+
+        if state
+            log_to_file "Done: found logo in screenshot"
+            return true
+        else
+            log_to_file "Failed: could not find logo in screenshot"
+            return false
+        end
+
+    end
+
     # Returns true if at least one image was found
     def search_for_images_by_src(logos = [])
         @logos ||= logos
@@ -45,20 +63,32 @@ class FindoLogo
     def image_with_src_exists?(image_src = '')
         
         begin
-            wait = Selenium::WebDriver::Wait.new(:timeout => 2)
- 
-            log_to_file "Done: found image #{image_src}" if wait.until {
-                @driver.find_element(:xpath => "//img[@src='#{image_src}']").displayed?
+            wait = Selenium::WebDriver::Wait.new(:timeout => 4)
+
+            wait.until {
+                if @driver.find_element(:xpath => "//img[@src='#{image_src}']").displayed?
+                    log_to_file "Done: found image #{image_src}"
+                    return true
+                else
+                    log_to_file "Failed: could not find image with src: #{image_src}"
+                    return false
+                end
             }
-            true
+ 
+        #     log_to_file "Done: found image #{image_src}" if wait.until {
+        #         @driver.find_element(:xpath => "//img[@src='#{image_src}']").displayed?
+        #     }
+        #     true
         rescue Exception => e
-            log_to_file "Failed: could not find image with src: #{image_src}"
-            false
+            log_to_file "Failed Exception: could not find image with src: #{image_src}"
+            return false
         end
+
+        return false
 
     end
 
-    def test_if_wrapper_visible?(selector = 'findologic_logo')
+    def test_if_wrapper_visible?(selector = 'logo')
         
         begin 
             wait = Selenium::WebDriver::Wait.new(:timeout => 3)
@@ -79,6 +109,7 @@ class FindoLogo
             false
         end
 
+        return false
     end
 
     def execute_tests
@@ -97,14 +128,16 @@ class FindoLogo
 
             @driver.get url
 
-            unless execute_tests
+            unless execute_tests                
                 take_screenshot(key)
                 log_to_file ">>>>>>>>>>>>>>>>>>>>>> FAILED"
             else
                 log_to_file ">>>>>>>>>>>>>>>>>>>>>> PASSED"
             end
-
+            
         end
+
+        search_for_logo_in_screenshot()
 
         quit  
     end
@@ -131,7 +164,8 @@ logos = [
 ]
 
 urls = {   
-    'Google' => "http://www.google.at"
+    #'Google' => "http://www.google.at"
+  
 }
 
 finder = FindoLogo.new({ 
