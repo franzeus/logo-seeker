@@ -2,6 +2,54 @@
 require 'rubygems'
 require 'selenium-webdriver'
 require 'RMagick'
+# -------------------------------------------------
+# Logger Class
+class Logger
+    include Singleton
+
+    attr_accessor :file
+
+    def self.set_up
+        @file = 'results.txt'
+        File.delete(@file) if File.exists?(@file)
+    end
+    
+    def self.nl
+        log "\n"
+    end
+
+    def self.line
+        "\n---------------------------\n"
+    end
+
+    def self.log_line
+        log line
+    end
+
+    def self.log message
+        puts message # For command line
+        File.open(@file, 'a+') {|file| file.write("#{message}\n") } if message
+    end
+
+end
+
+# -------------------------------------------------
+# Website Class
+#   => represents a single website
+class Website
+
+    attr_accessor :title, :url, :is_image_visible, :is_wrapper_visible, :has_logo
+
+    def initialize(data)
+        @title = data[:title]
+        @url = data[:url]        
+
+        @is_wrapper_visible = false
+        @is_image_visible = false
+        @has_logo = false
+    end
+
+end
 
 # -------------------------------------------------
 # FindoLogo Class
@@ -11,165 +59,183 @@ require 'RMagick'
 
 class FindoLogo
 
-    attr_accessor :driver, :image_dir, :urls, :logos
+    attr_accessor :driver, :image_dir, :websites, :logos
 
     def initialize(options)
-        puts "Starting selenium-webdriver ..."
-
-        @driver = Selenium::WebDriver.for :firefox
         @image_dir = 'images/screenshots'
-        @urls = options[:urls_to_visit]
+        @websites_data = options[:websites_to_visit]
         @logos = options[:logos_to_search_for]
+        @websites = []
 
-        @log_file = 'results.txt' # options[:log_file_name] ||
-        File.delete(@log_file) if File.exists?(@log_file)
+        push_websites()
     end
 
-    def take_screenshot(name)
-        path = "#{@image_dir}/#{name.downcase}.png"
-        @driver.save_screenshot(path)
-        log_to_file "Screenshot taken [Saved to: #{path}]"
+    def run                
+        before_run()
+
+        visit_websites()       
+
+        after_run()
     end
 
-    def search_for_logo_in_screenshot
+    def before_run
+        start_driver()
+    end
 
-        logo = Magick::Image.read("images/logos/logo1.png").first
-        target = Magick::Image.read("images/screenshots/.png").first
+    def after_run        
+        @driver.quit
+    end
 
-        state = target.find_similar_region(logo)
+    def push_websites
 
-        if state
-            log_to_file "Done: found logo in screenshot"
-            return true
-        else
-            log_to_file "Failed: could not find logo in screenshot"
-            return false
+        return false if !@websites_data
+
+        @websites_data.each do |key, value|
+            @websites.push( Website.new({ :title => key, :url => value }) )
         end
 
     end
 
-    # Returns true if at least one image was found
-    def search_for_images_by_src(logos = [])
-        @logos ||= logos
-
-       # @logos.each do |key|
-            return true if image_with_src_exists?(@logos[0])
-        #end
-
-        return false
+    def start_driver
+        puts "Starting selenium-webdriver ..."
+        @driver = Selenium::WebDriver.for :firefox
     end
 
-    # Returns true if image was found
-    def image_with_src_exists?(image_src = '')
+    # --------------------------------------
+    def visit_websites
         
-        begin
-            wait = Selenium::WebDriver::Wait.new(:timeout => 4)
-
-            wait.until {
-                if @driver.find_element(:xpath => "//img[@src='#{image_src}']").displayed?
-                    log_to_file "Done: found image #{image_src}"
-                    return true
-                else
-                    log_to_file "Failed: could not find image with src: #{image_src}"
-                    return false
-                end
-            }
- 
-        #     log_to_file "Done: found image #{image_src}" if wait.until {
-        #         @driver.find_element(:xpath => "//img[@src='#{image_src}']").displayed?
-        #     }
-        #     true
-        rescue Exception => e
-            log_to_file "Failed Exception: could not find image with src: #{image_src}"
-            return false
-        end
-
-        return false
-
-    end
-
-    def test_if_wrapper_visible?(selector = 'logo')
-        
-        begin 
-            wait = Selenium::WebDriver::Wait.new(:timeout => 3)
+        websites.each do |website|
             
-            wait.until {
-                linkWrapper = @driver.find_element(:class, selector)
+            Logger::nl
+            Logger::log_line
+            Logger::log "Visiting #{website.title} - #{website.url}"
 
-                if linkWrapper.displayed?
-                    log_to_file "Done: .#{selector} selector is visible"
-                    true
-                else
-                    log_to_file "Error: .#{selector} selector is hidden or not found"
-                    false
-                end
-            }
-        rescue Exception => e
-            log_to_file "Failed: .#{selector} selector is hidden or not found"
-            false
-        end
+            @driver.get website.url
 
-        return false
-    end
-
-    def execute_tests
-        img_exists = search_for_images_by_src
-        wrapper_exists = test_if_wrapper_visible?
-
-        return img_exists || wrapper_exists
-    end
-
-    def visit_urls        
-        
-        urls.each do |key, url|
-            
-            log_to_file line
-            log_to_file "Visiting #{key} - #{url}"
-
-            @driver.get url
-
-            unless execute_tests                
-                take_screenshot(key)
-                log_to_file ">>>>>>>>>>>>>>>>>>>>>> FAILED"
+            if execute_tests_on website
+                Logger::log ">>>>>>>>>>>>>>>>>>>>>> PASSED"
             else
-                log_to_file ">>>>>>>>>>>>>>>>>>>>>> PASSED"
+                Logger::log ">>>>>>>>>>>>>>>>>>>>>> FAILED"
             end
             
         end
 
-        search_for_logo_in_screenshot()
-
-        quit  
     end
 
-    def quit
-        @driver.quit
+    def execute_tests_on website
+
+        website.is_image_visible   = test_if_a_logo_visible?
+        website.is_wrapper_visible = test_if_element_visible?({:class => "fl_logo_wrapper"})
+
+        screenshot = take_screenshot(website.title)
+
+        website.has_logo = search_for_logos_in_screenshot(screenshot)
+
     end
 
-    def line
-        "\n---------------------------\n"
+    def test_if_element_visible?(selector)
+        isVisible = false
+
+        begin
+            wait = Selenium::WebDriver::Wait.new(:timeout => 3)            
+            wait.until {
+                element = @driver.find_element( selector )
+                isVisible = element.displayed?                 
+            }
+        rescue Exception => e         
+            false
+        end
+
+        return isVisible
     end
 
-    def log_to_file message
-        puts message # For command line
-        File.open(@log_file, 'a+') {|file| file.write("#{message}\n") }
+    def take_screenshot(file_name)
+
+        path = "#{@image_dir}/#{file_name.downcase}.png"
+        @driver.save_screenshot(path)
+
+        Logger::log "Screenshot taken [Saved to: #{path}]"
+        
+        return path
+
     end
+
+    def test_if_a_logo_visible?
+        state = false
+
+        @logos.each do |logo|
+            if test_if_element_visible?({:xpath => "//img[@src='#{logo}']"})
+                state = true
+                break
+            end
+        end
+
+        return state
+        
+    end
+    
+    def search_for_logos_in_screenshot(screenshot)
+        state = false
+
+        @logos.each do |logo|
+            if logo_in_screenshot(logo, screenshot)
+                state = true
+                break
+            end
+        end
+
+        return state
+    end
+
+    def logo_in_screenshot(logo_file, screenshot)
+        
+        state = false
+
+        begin
+            logo = Magick::Image.read("images/logos/#{logo_file}").first
+            target = Magick::Image.read(screenshot).first
+
+            state = target.find_similar_region(logo)
+
+            Logger::log "Searching for #{logo_file} in #{screenshot} ..."
+            puts state.inspect
+
+            if state
+                Logger::log "Done: found #{logo_file} in screenshot"
+                state = true
+            else
+                Logger::log "Failed: could not find #{logo_file} in screenshot"
+                state = false
+            end    
+
+        rescue Exception => e
+            Logger::log "Failed to search for logo in screenshot"
+            false        
+        end
+
+        return state
+
+    end
+   
 end
 
 # ----------------------------------
 # Setup and init
 # ----------------------------------
+Logger::set_up()
+
 logos = [
-  
+    #"FINDOLOGIC_claimer_german_grau.png",
+    "google.png"
 ]
 
-urls = {   
-    #'Google' => "http://www.google.at"
-  
+websites = {
+    "Google" => "http://www.google.at/"
+    #'Outstore' => 'http://www.outstore.de/?searchparam=jacke&cl=search&stoken=21C57597&force_sid=ht8at44b5228n04ju235sbnhn6&lang=0&ref=teaser'
 }
 
-finder = FindoLogo.new({ 
-    :urls_to_visit => urls, 
+finder = FindoLogo.new({
+    :websites_to_visit => websites,
     :logos_to_search_for => logos
 })
-finder.visit_urls
+finder.run
