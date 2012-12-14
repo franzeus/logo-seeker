@@ -124,7 +124,7 @@ class FindoLogo
 
     def execute_tests_on website
 
-        website.is_image_visible   = test_if_a_logo_visible?
+        website.is_image_visible   = test_if_a_logo_visible? #TODO: set this to website should_have_logo_file
         website.is_wrapper_visible = test_if_element_visible?({:class => "fl_logo_wrapper"})
 
         screenshot = take_screenshot(website.title)
@@ -151,12 +151,13 @@ class FindoLogo
 
     def take_screenshot(file_name)
 
-        path = "#{@image_dir}/#{file_name.downcase}.png"
+        file_name = "#{file_name.downcase}.png"
+        path = "#{@image_dir}/#{file_name}"
         @driver.save_screenshot(path)
 
         Logger::log "Screenshot taken [Saved to: #{path}]"
         
-        return path
+        return file_name
 
     end
 
@@ -190,18 +191,20 @@ class FindoLogo
     def logo_in_screenshot(logo_file, screenshot)
         
         state = false
-
+        screenshot_file = "images/screenshots/#{screenshot}";
         begin
             logo = Magick::Image.read("images/logos/#{logo_file}").first
-            target = Magick::Image.read(screenshot).first
+            target = Magick::Image.read(screenshot_file).first
 
             state = target.find_similar_region(logo)
 
             Logger::log "Searching for #{logo_file} in #{screenshot} ..."
-            puts state.inspect
+            puts logo.rows
+            puts logo.columns
 
-            if state
-                Logger::log "Done: found #{logo_file} in screenshot"
+            if state             
+                draw_rectangle_on(state[0], state[1], logo.columns, logo.rows, screenshot_file)
+                Logger::log "Done: found #{logo_file} in screenshot"                
                 state = true
             else
                 Logger::log "Failed: could not find #{logo_file} in screenshot"
@@ -216,6 +219,20 @@ class FindoLogo
         return state
 
     end
+
+    def draw_rectangle_on(x, y, width, height, target_path)
+        
+        target = Magick::Image.read(target_path).first
+
+        gc = Magick::Draw.new
+        gc.stroke('red')
+        gc.fill_opacity(0)
+        gc.stroke_width(2)
+        gc.rectangle(x, y, x + width, y + height)        
+        gc.draw(target)
+        target.write(target_path)
+
+    end
    
 end
 
@@ -225,13 +242,11 @@ end
 Logger::set_up()
 
 logos = [
-    #"FINDOLOGIC_claimer_german_grau.png",
-    "google.png"
+
 ]
 
 websites = {
-    "Google" => "http://www.google.at/"
-    #'Outstore' => 'http://www.outstore.de/?searchparam=jacke&cl=search&stoken=21C57597&force_sid=ht8at44b5228n04ju235sbnhn6&lang=0&ref=teaser'
+
 }
 
 finder = FindoLogo.new({

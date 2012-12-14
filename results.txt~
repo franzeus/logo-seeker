@@ -2,12 +2,3 @@
 ---------------------------
 
 Visiting Outsore.de - http://www.outstore.de/?searchparam=hemd&cl=search&stoken=C69F5089&force_sid=&lang=0&ref=teaser
-Image-Src Test passed for logo https://secure.findologic.com/www/images/FINDOLOGIC_claimer_german_grau.png
-Done: findologic_logo is visible
-
----------------------------
-
-Visiting Playtin - http://www.playtin.com
-Image-Src Test failed for logo https://secure.findologic.com/www/images/FINDOLOGIC_claimer_german_grau.png
-Visiblity-Test failed for selector findologic_logo
-Screenshot taken.
