@@ -1,7 +1,13 @@
-# https://github.com/webarbeit/logo-seeker
+#
+# FINDOLOGO 
+# tests if a website has a specific image
+#
+
+# Requiered GEMs:
 require 'rubygems'
 require 'selenium-webdriver'
 require 'RMagick'
+
 # -------------------------------------------------
 # Logger Class
 class Logger
@@ -18,8 +24,10 @@ class Logger
         log "\n"
     end
 
-    def self.line
-        "\n---------------------------\n"
+    def self.line(amount = 24)
+        line = ""
+        amount.times { line += "-" }
+        return line
     end
 
     def self.log_line
@@ -42,7 +50,7 @@ class Website
 
     def initialize(data)
         @title = data[:title]
-        @url = data[:url]        
+        @url = data[:url]
 
         @is_wrapper_visible = false
         @is_image_visible = false
@@ -112,7 +120,7 @@ class FindoLogo
 
             @driver.get website.url
 
-            if execute_tests_on website
+            if execute_tests_on_website website
                 Logger::log ">>>>>>>>>>>>>>>>>>>>>> PASSED"
             else
                 Logger::log ">>>>>>>>>>>>>>>>>>>>>> FAILED"
@@ -122,9 +130,9 @@ class FindoLogo
 
     end
 
-    def execute_tests_on website
+    def execute_tests_on_website website
 
-        website.is_image_visible   = test_if_a_logo_visible? #TODO: set this to website should_have_logo_file
+        website.is_image_visible   = test_if_a_logo_visible? #TODO: set this to website should_have_logo_file if found
         website.is_wrapper_visible = test_if_element_visible?({:class => "fl_logo_wrapper"})
 
         screenshot = take_screenshot(website.title)
@@ -179,7 +187,7 @@ class FindoLogo
         state = false
 
         @logos.each do |logo|
-            if logo_in_screenshot(logo, screenshot)
+            if locate_logo_in_screenshot(logo, screenshot)
                 state = true
                 break
             end
@@ -188,7 +196,7 @@ class FindoLogo
         return state
     end
 
-    def logo_in_screenshot(logo_file, screenshot)
+    def locate_logo_in_screenshot(logo_file, screenshot)
         
         state = false
         screenshot_file = "images/screenshots/#{screenshot}";
@@ -203,8 +211,8 @@ class FindoLogo
             puts logo.columns
 
             if state             
-                draw_rectangle_on(state[0], state[1], logo.columns, logo.rows, screenshot_file)
-                Logger::log "Done: found #{logo_file} in screenshot"                
+                Logger::log "Done: found #{logo_file} in screenshot"
+                draw_rectangle_on_screenshot(state[0], state[1], logo.columns, logo.rows, screenshot_file)
                 state = true
             else
                 Logger::log "Failed: could not find #{logo_file} in screenshot"
@@ -212,7 +220,7 @@ class FindoLogo
             end    
 
         rescue Exception => e
-            Logger::log "Failed to search for logo in screenshot"
+            Logger::log "Failed to find logo in screenshot"
             false        
         end
 
@@ -220,7 +228,7 @@ class FindoLogo
 
     end
 
-    def draw_rectangle_on(x, y, width, height, target_path)
+    def draw_rectangle_on_screenshot(x, y, width, height, target_path)
         
         target = Magick::Image.read(target_path).first
 
